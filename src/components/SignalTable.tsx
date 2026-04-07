@@ -96,7 +96,7 @@ export default function SignalTable({ initialSignals }: { initialSignals: Signal
       <div className="flex flex-wrap gap-2 mb-6">
         <FilterGroup
           label="Coin"
-          options={["ALL", "BTC", "ETH", "SOL", "TAO", "XRP"]}
+          options={["ALL", ...Array.from(new Set(signals.map((s) => s.coin))).sort()]}
           value={filter.coin}
           onChange={(v) => setFilter((f) => ({ ...f, coin: v }))}
         />
@@ -151,7 +151,7 @@ export default function SignalTable({ initialSignals }: { initialSignals: Signal
       {signals.length === 0 && (
         <div className="text-center py-20 text-zinc-600">
           <p className="text-lg">Keine Signale vorhanden.</p>
-          <p className="text-sm mt-2">Warte auf den naechsten 2h-Trigger...</p>
+          <p className="text-sm mt-2">SWING checkt alle 4h, SCALP jede Stunde — 25 Coins</p>
         </div>
       )}
     </div>
