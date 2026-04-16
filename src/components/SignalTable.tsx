@@ -158,70 +158,148 @@ export default function SignalTable({ initialSignals }: { initialSignals: Signal
   );
 }
 
+function calcLivePnl(s: Signal): number | null {
+  if (s.status === "ACTIVE" && s.current_price != null) {
+    const lev = s.leverage || 2;
+    if (s.direction === "LONG") {
+      return ((s.current_price - s.entry_price) / s.entry_price) * 100 * lev;
+    }
+    return ((s.entry_price - s.current_price) / s.entry_price) * 100 * lev;
+  }
+  return null;
+}
+
 function SignalRow({ signal: s }: { signal: Signal }) {
+  const [expanded, setExpanded] = useState(false);
   const coinColor = COIN_COLORS[s.coin] || "#888";
   const statusCfg = STATUS_CONFIG[s.status];
   const isLong = s.direction === "LONG";
   const isSwing = s.signal_type === "SWING";
+  const isResolved = s.status !== "ACTIVE";
+
+  // Live PNL for ACTIVE, frozen pnl_pct for resolved
+  const livePnl = calcLivePnl(s);
+  const displayPnl = isResolved ? s.pnl_pct : livePnl;
 
   return (
     <div
-      className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 p-3 rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 transition-colors"
+      className={`rounded-lg bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 transition-colors cursor-pointer`}
       style={{ borderLeftWidth: 3, borderLeftColor: isSwing ? "#3b82f6" : "#f97316" }}
+      onClick={() => setExpanded(!expanded)}
     >
-      {/* Coin + Direction */}
-      <div className="flex items-center gap-2 min-w-[120px]">
-        <span className="text-xs font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: coinColor + "22", color: coinColor }}>
-          {s.coin}
-        </span>
-        <span
-          className="text-xs font-bold px-1.5 py-0.5 rounded"
-          style={{
-            backgroundColor: isLong ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
-            color: isLong ? "#22c55e" : "#ef4444",
-          }}
-        >
-          {s.direction}
-        </span>
-        <span
-          className="text-[10px] font-bold px-1 py-0.5 rounded uppercase"
-          style={{
-            backgroundColor: isSwing ? "rgba(59,130,246,0.15)" : "rgba(249,115,22,0.15)",
-            color: isSwing ? "#3b82f6" : "#f97316",
-          }}
-        >
-          {s.signal_type}
-        </span>
-      </div>
-
-      {/* Prices */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs flex-1">
-        <PriceLabel label="Entry" value={formatPrice(s.entry_price)} />
-        <PriceLabel label="TP1" value={formatPrice(s.tp1_price)} color="#3b82f6" />
-        <PriceLabel label="TP2" value={formatPrice(s.tp2_price)} color="#8b5cf6" />
-        <PriceLabel label="SL" value={formatPrice(s.sl_price)} color="#ef4444" />
-        <span className="text-zinc-500">{s.leverage}x</span>
-      </div>
-
-      {/* Status + PnL + Time */}
-      <div className="flex items-center gap-3 text-xs">
-        {s.pnl_pct !== null && s.status !== "ACTIVE" && (
-          <span
-            className="font-bold"
-            style={{ color: s.pnl_pct >= 0 ? "#22c55e" : "#ef4444" }}
-          >
-            {s.pnl_pct >= 0 ? "+" : ""}
-            {s.pnl_pct.toFixed(2)}%
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 p-3">
+        {/* Coin + Direction */}
+        <div className="flex items-center gap-2 min-w-[120px]">
+          <span className="text-xs font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: coinColor + "22", color: coinColor }}>
+            {s.coin}
           </span>
-        )}
-        <span
-          className="px-2 py-0.5 rounded font-bold text-[10px]"
-          style={{ backgroundColor: statusCfg.bg, color: statusCfg.color }}
-        >
-          {statusCfg.label}
-        </span>
-        <span className="text-zinc-500 min-w-[50px] text-right">{timeAgo(s.created_at)}</span>
+          <span
+            className="text-xs font-bold px-1.5 py-0.5 rounded"
+            style={{
+              backgroundColor: isLong ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)",
+              color: isLong ? "#22c55e" : "#ef4444",
+            }}
+          >
+            {s.direction}
+          </span>
+          <span
+            className="text-[10px] font-bold px-1 py-0.5 rounded uppercase"
+            style={{
+              backgroundColor: isSwing ? "rgba(59,130,246,0.15)" : "rgba(249,115,22,0.15)",
+              color: isSwing ? "#3b82f6" : "#f97316",
+            }}
+          >
+            {s.signal_type}
+          </span>
+        </div>
+
+        {/* Prices */}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs flex-1">
+          <PriceLabel label="Entry" value={formatPrice(s.entry_price)} />
+          <PriceLabel label="TP1" value={formatPrice(s.tp1_price)} color="#3b82f6" />
+          <PriceLabel label="TP2" value={formatPrice(s.tp2_price)} color="#8b5cf6" />
+          <PriceLabel label="SL" value={formatPrice(s.sl_price)} color="#ef4444" />
+          <span className="text-zinc-500">{s.leverage}x</span>
+        </div>
+
+        {/* Status + PnL + Time */}
+        <div className="flex items-center gap-3 text-xs">
+          {displayPnl != null && (
+            <span
+              className="font-bold"
+              style={{ color: displayPnl >= 0 ? "#22c55e" : "#ef4444" }}
+            >
+              {displayPnl >= 0 ? "+" : ""}
+              {displayPnl.toFixed(2)}%
+              {!isResolved && <span className="text-zinc-500 font-normal ml-1 text-[9px]">live</span>}
+            </span>
+          )}
+          <span
+            className="px-2 py-0.5 rounded font-bold text-[10px]"
+            style={{ backgroundColor: statusCfg.bg, color: statusCfg.color }}
+          >
+            {statusCfg.label}
+          </span>
+          <span className="text-zinc-500 min-w-[50px] text-right">{timeAgo(s.created_at)}</span>
+          <svg
+            className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${expanded ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
       </div>
+
+      {/* Expanded Details */}
+      {expanded && (
+        <div className="px-3 pb-3 pt-1 border-t border-zinc-800 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          {s.current_price != null && (
+            <div>
+              <span className="text-zinc-500">Aktuell: </span>
+              <span className="text-white font-medium">{formatPrice(s.current_price)}</span>
+            </div>
+          )}
+          {s.atr_used != null && (
+            <div>
+              <span className="text-zinc-500">ATR: </span>
+              <span className="text-white font-medium">{formatPrice(s.atr_used)}</span>
+            </div>
+          )}
+          {s.resolved_at && (
+            <div>
+              <span className="text-zinc-500">Resolved: </span>
+              <span className="text-white font-medium">{new Date(s.resolved_at).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+          )}
+          {s.expires_at && (
+            <div>
+              <span className="text-zinc-500">Expires: </span>
+              <span className="text-white font-medium">{new Date(s.expires_at).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+          )}
+          {s.tp1_hit_at && (
+            <div>
+              <span className="text-zinc-500">TP1 Hit: </span>
+              <span className="text-white font-medium">{new Date(s.tp1_hit_at).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+          )}
+          {s.tp2_hit_at && (
+            <div>
+              <span className="text-zinc-500">TP2 Hit: </span>
+              <span className="text-white font-medium">{new Date(s.tp2_hit_at).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+          )}
+          {s.signal_reason && (
+            <div className="col-span-2 sm:col-span-4">
+              <span className="text-zinc-500">Reason: </span>
+              <span className="text-zinc-300">{s.signal_reason}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
